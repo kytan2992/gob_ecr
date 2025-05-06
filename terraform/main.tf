@@ -8,7 +8,7 @@ resource "aws_ecr_repository" "emailservice" {
 }
 
 resource "aws_ecr_repository" "checkout" {
-  name         = "${local.name_prefix}-checkout"
+  name         = "${local.name_prefix}-checkoutservice"
   force_delete = true
 }
 
@@ -28,7 +28,7 @@ resource "aws_ecr_repository" "paymentservice" {
 }
 
 resource "aws_ecr_repository" "productcatalog" {
-  name         = "${local.name_prefix}-productcatalog"
+  name         = "${local.name_prefix}-productcatalogservice"
   force_delete = true
 }
 

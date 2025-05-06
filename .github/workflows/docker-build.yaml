@@ -23,81 +23,57 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Pull, Tag, and Push Images to ECR
+        shell: bash
         run: |
-          ACCOUNT_ID            = $(aws sts get-caller-identity --query "Account" --output text)
+          set -e
+          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          REGION=${AWS_REGION:-us-east-1} 
 
-          EMAIL_IMAGE           = "us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice:v0.10.2"
-          CHECKOUT_IMAGE        = "us-central1-docker.pkg.dev/google-samples/microservices-demo/checkoutservice:v0.10.2"
-          RECOMMENDATION_IMAGE  = "us-central1-docker.pkg.dev/google-samples/microservices-demo/recommendationservice:v0.10.2"
-          FRONTEND_IMAGE        = "us-central1-docker.pkg.dev/google-samples/microservices-demo/frontend:v0.10.2"
-          PAYMENT_IMAGE         = "us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice:v0.10.2"
-          PRODUCT_CATALOG_IMAGE = "us-central1-docker.pkg.dev/google-samples/microservices-demo/productcatalogservice:v0.10.2"
-          CARTSERVICE_IMAGE     = "us-central1-docker.pkg.dev/google-samples/microservices-demo/cartservice:v0.10.2"
-          REDIS_IMAGE           = "redis:alpine"
-          BUSYBOX_IMAGE         = "busybox:latest"
-          LOADGEN_IMAGE         = "us-central1-docker.pkg.dev/google-samples/microservices-demo/loadgenerator:v0.10.2"
-          CURRENCY_IMAGE        = "us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice:v0.10.2"
-          SHIPPING_IMAGE        = "us-central1-docker.pkg.dev/google-samples/microservices-demo/shippingservice:v0.10.2"
-          AD_IMAGE              = "us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice:v0.10.2"
+          declare -A boutique_services=(
+            [emailservice]="v0.10.2"
+            [checkoutservice]="v0.10.2"
+            [recommendationservice]="v0.10.2"
+            [frontend]="v0.10.2"
+            [paymentservice]="v0.10.2"
+            [productcatalogservice]="v0.10.2"
+            [cartservice]="v0.10.2"
+            [loadgenerator]="v0.10.2"
+            [currencyservice]="v0.10.2"
+            [shippingservice]="v0.10.2"
+            [adservice]="v0.10.2"
+          )
 
-          # Please change the ECR names to match your repository names in Terraform
+          for service in "${!boutique_services[@]}"; do
+            version=${boutique_services[$service]}
+            src="us-central1-docker.pkg.dev/google-samples/microservices-demo/${service}:${version}"
+            dest="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/ky-tf-${service}:${version}"
 
-          EMAIL_ECR             = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-emailservice:v0.10.2"
-          CHECKOUT_ECR          = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-checkoutservice:v0.10.2"
-          RECOMMENDATION_ECR    = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-recommendationservice:v0.10.2"
-          FRONTEND_ECR          = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-frontend:v0.10.2"
-          PAYMENT_ECR           = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-paymentservice:v0.10.2"
-          PRODUCT_CATALOG_ECR   = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-productcatalog:v0.10.2"
-          CARTSERVICE_ECR       = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-cartservice:v0.10.2"
-          REDIS_ECR             = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-redisalpine:alpine"
-          BUSYBOX_ECR           = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-busybox:latest"
-          LOADGEN_ECR           = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-loadgenerator:v0.10.2"
-          CURRENCY_ECR          = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-currencyservice:v0.10.2"
-          SHIPPING_ECR          = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-shippingservice:v0.10.2"
-          AD_ECR                = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ky-tf-adservice:v0.10.2"
+            echo "Processing $service..."
+            docker pull "$src"
+            docker tag "$src" "$dest"
+            docker push "$dest"
+          done
 
-          # Pull from Google Artifact Registry
-          docker pull $EMAIL_IMAGE
-          docker pull $CHECKOUT_IMAGE
-          docker pull $RECOMMENDATION_IMAGE
-          docker pull $FRONTEND_IMAGE
-          docker pull $PAYMENT_IMAGE
-          docker pull $PRODUCT_CATALOG_IMAGE
-          docker pull $CARTSERVICE_IMAGE
-          docker pull $REDIS_IMAGE
-          docker pull $BUSYBOX_IMAGE
-          docker pull $LOADGEN_IMAGE
-          docker pull $CURRENCY_IMAGE
-          docker pull $SHIPPING_IMAGE
-          docker pull $AD_IMAGE
+           # Handle redis and busybox
+          declare -A misc_images=(
+            [redis]="alpine"
+            [busybox]="latest"
+          )
 
-          # Tag for ECR
-          docker tag $EMAIL_IMAGE $EMAIL_ECR
-          docker tag $CHECKOUT_IMAGE $CHECKOUT_ECR
-          docker tag $RECOMMENDATION_IMAGE $RECOMMENDATION_ECR
-          docker tag $FRONTEND_IMAGE $FRONTEND_ECR
-          docker tag $PAYMENT_IMAGE $PAYMENT_ECR
-          docker tag $PRODUCT_CATALOG_IMAGE $PRODUCT_CATALOG_ECR
-          docker tag $CARTSERVICE_IMAGE $CARTSERVICE_ECR
-          docker tag $REDIS_IMAGE $REDIS_ECR
-          docker tag $BUSYBOX_IMAGE $BUSYBOX_ECR
-          docker tag $LOADGEN_IMAGE $LOADGEN_ECR
-          docker tag $CURRENCY_IMAGE $CURRENCY_ECR
-          docker tag $SHIPPING_IMAGE $SHIPPING_ECR
-          docker tag $AD_IMAGE $AD_ECR
+          for name in "${!misc_images[@]}"; do
+            tag="${misc_images[$name]}"
+            src="${name}:${tag}"
 
+            if [ "$name" == "redis" ]; then
+              ecr_repo="ky-tf-redisalpine"
+            else
+              ecr_repo="ky-tf-${name}"
+            fi
 
-          # Push to ECR
-          docker push $EMAIL_ECR
-          docker push $CHECKOUT_ECR
-          docker push $RECOMMENDATION_ECR
-          docker push $FRONTEND_ECR
-          docker push $PAYMENT_ECR
-          docker push $PRODUCT_CATALOG_ECR
-          docker push $CARTSERVICE_ECR
-          docker push $REDIS_ECR
-          docker push $BUSYBOX_ECR
-          docker push $LOADGEN_ECR
-          docker push $CURRENCY_ECR
-          docker push $SHIPPING_ECR
-          docker push $AD_ECR
+            dest="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ecr_repo}:${tag}"
+
+            echo "Processing $name..."
+            docker pull "$src"
+            docker tag "$src" "$dest"
+            docker push "$dest"
+          done
